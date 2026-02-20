@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EvermoreStars 未读章节 1.0 - CALL</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --es-blue: #7ccff2;
+            --es-pink: #fda8d4;
+            --es-yellow: #ffeb3b;
+            --glass: rgba(255, 255, 255, 0.98);
+        }
+
+        html { -webkit-text-size-adjust: none; text-size-adjust: none; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            background-color: #fce4ec; 
+            display: flex; flex-direction: column; align-items: center; 
+            min-height: 100vh; font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            padding: 10px 10px 60px 10px; overflow-x: hidden;
+        }
+
+        /* ================= 开屏动画 ================= */
+        #opening-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #fce4ec; display: flex; align-items: center; justify-content: center;
+            z-index: 999;
+        }
+        .opening-container { 
+            position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; 
+        }
+        .animate-ripple { position: absolute; border-radius: 50%; animation: ripple 3s infinite ease-out; }
+        @keyframes ripple {
+            0% { width: 100px; height: 100px; opacity: 1; border-width: 2px; }
+            100% { width: 500px; height: 500px; opacity: 0; border-width: 1px; }
+        }
+        .opening-star { width: 160px; height: 160px; z-index: 10; animation: pulse-glow 2s infinite ease-in-out; }
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(253,168,212,0.5)); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 30px rgba(124,207,242,0.8)); }
+        }
+        .loading-text {
+            margin-top: 20px; font-weight: bold; color: var(--es-pink);
+            letter-spacing: 2px; font-size: 0.9rem; animation: text-fade 1.5s infinite; z-index: 10;
+        }
+        @keyframes text-fade { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+        /* ================= 热区交互 ================= */
+        .poster-container {
+            position: relative; width: 100%; max-width: 800px; margin: 0 auto;
+            border-radius: 15px; background: #fff; overflow: hidden;
+            box-shadow: 0 15px 40px rgba(253, 168, 212, 0.3);
+        }
+        .poster-img { width: 100%; height: auto; display: block; pointer-events: none; }
+
+        .hotspot { 
+            position: absolute; cursor: pointer; z-index: 10; 
+            background: rgba(255, 255, 255, 0.2); 
+            border: 1.5px solid rgba(255, 255, 255, 0.7);
+            animation: hotspot-glow 2s infinite ease-in-out; 
+            transition: all 0.3s ease;
+        }
+        @keyframes hotspot-glow {
+            0%, 100% { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.4); }
+            50% { background: rgba(255, 255, 255, 0.4); border-color: rgba(255, 255, 255, 1); box-shadow: 0 0 15px rgba(255, 255, 255, 0.5); }
+        }
+
+        .spot-lineup { top: 0.8%; right: 10.5%; width: 10%; height: 4%; border-radius: 20px; }
+        .spot-info { top: 0.8%; right: 2.2%; width: 7%; height: 4%; border-radius: 20px; }
+        .spot-special { top: 23%; left: 12%; width: 18%; height: 9%; transform: rotate(-10deg); border-radius: 10px; }
+        .spot-fanworks { top: 39.5%; left: 5%; width: 20%; height: 11%; transform: rotate(-16.3deg); border-radius: 10px; }
+        .spot-mainstage { top: 12.5%; right: 13%; width: 15%; height: 12%; transform: rotate(-19deg); border-radius: 10px; }
+        .spot-creative { top: 35%; right: 11%; width: 18%; height: 12%; transform: rotate(10deg); border-radius: 10px; }
+        .spot-evermore { top: 49.2%; right: 0.1%; width: 28%; height: 4%; transform: rotate(-24.3deg); border-radius: 5px; }
+        .spot-location { top: 60%; left: 2.0%; width: 30%; height: 4%; border-radius: 5px; }
+
+        .social-bar { position: absolute; top: 1.2%; left: 18%; display: flex; gap: 12px; z-index: 20; }
+        .social-link { color: #ffffff !important; font-size: 1.1rem; filter: drop-shadow(0 0 2px rgba(0,0,0,0.2)); transition: color 0.3s ease; }
+        
+        @media screen and (max-width: 768px) {
+            .social-bar { top: 0.4%; left: 19%; gap: 5px; }
+            .social-link { font-size: 0.65rem; }
+        }
+
+        .social-link.bili:hover, .social-link.bili:active { color: #fb7299 !important; }
+        .social-link.dy:hover, .social-link.dy:active { color: #000000 !important; }
+        .social-link.xhs:hover, .social-link.xhs:active { color: #ff2442 !important; }
+        .social-link.qq:hover, .social-link.qq:active { color: #12b7f5 !important; }
+
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.3); z-index: 100; justify-content: center; align-items: flex-start;
+            padding: 5vh 0; overflow-y: auto;
+        }
+        .modal-card {
+            background: var(--glass); width: 92%; max-width: 500px; 
+            border-radius: 30px; padding: 25px; border: 2px solid white;
+            position: relative; box-shadow: 0 25px 50px rgba(0,0,0,0.15); margin: auto;
+        }
+        .modal-header { color: var(--es-pink); font-size: 1.3rem; font-weight: 900; text-align: center; margin-bottom: 20px; }
+        .clickable-row {
+            background: #fff; padding: 15px 20px; border-radius: 15px; margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; border: 1px solid #eee; font-weight: bold;
+        }
+        .sub-layer { width: 100%; display: none; flex-direction: column; }
+        .sub-body { color: #555; font-size: 0.95rem; line-height: 1.8; padding-bottom: 20px; }
+        .group-tip { background: #fff0f3; padding: 12px; border-radius: 12px; border-left: 4px solid var(--es-pink); margin-bottom: 15px; color: #ff4081; font-weight: bold; font-size: 0.85rem; }
+        .back-btn { color: var(--es-blue); cursor: pointer; font-weight: bold; margin-bottom: 15px; display: block; }
+        .close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; font-size: 22px; color: #ccc; background:none; border:none; }
+        .site-footer { margin-top: 30px; text-align: center; font-size: 10px; color: #b388ff; line-height: 1.6; padding: 0 10px; }
+        .qq-qrcode { width: 160px; height: 160px; border-radius: 15px; margin-bottom: 15px; }
+
+        .venue-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 10px; }
+        .venue-item { width: 100%; text-align: center; }
+        .venue-img { width: 100%; height: auto; border-radius: 10px; display: block; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .venue-label { font-size: 0.75rem; color: #888; margin-top: 4px; }
+
+        /* 嘉宾详情样式优化 */
+        .guest-container { width: 100%; }
+        .guest-social-row { display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 15px; border-radius: 15px; margin-bottom: 15px; border: 1px solid #eee; }
+        .guest-name-label { color: var(--es-blue); font-size: 1.1rem; font-weight: bold; }
+        .guest-icon-group { display: flex; gap: 15px; }
+        .guest-icon-group a { font-size: 1.2rem; color: #ddd; transition: color 0.3s; }
+        .guest-icon-group a:hover { color: var(--es-pink); }
+        .guest-full-image { width: 100%; border-radius: 15px; display: block; margin-top: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+    <div id="opening-screen">
+        <div class="opening-container">
+            <div class="animate-ripple" style="border: 1px solid rgba(124, 207, 242, 0.6);"></div>
+            <div class="animate-ripple" style="border: 1px solid rgba(253, 168, 212, 0.6); animation-delay: 0.8s;"></div>
+            <svg viewBox="0 0 200 200" class="opening-star">
+                <defs>
+                    <linearGradient id="openingStarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#4b5ee9" /><stop offset="50%" style="stop-color:#ffffff" /><stop offset="100%" style="stop-color:#f63479" />
+                    </linearGradient>
+                </defs>
+                <path d="M100 10 L120 80 L190 100 L120 120 L100 190 L80 120 L10 100 L80 80 Z" fill="url(#openingStarGrad)" />
+            </svg>
+            <div class="loading-text">INITIALIZING...</div>
+        </div>
+    </div>
+
+    <div class="poster-container">
+        <div class="social-bar">
+            <a href="https://space.bilibili.com/" target="_blank" class="social-link bili"><i class="fab fa-bilibili"></i></a>
+            <a href="https://v.douyin.com/M8ooJI61w-4/" target="_blank" class="social-link dy"><i class="fab fa-tiktok"></i></a>
+            <a href="https://xhslink.com/m/5KRgXDuEuB1" target="_blank" class="social-link xhs"><i class="fas fa-camera-retro"></i></a>
+            <a href="javascript:void(0)" onclick="openQQPopup()" class="social-link qq"><i class="fab fa-qq"></i></a>
+        </div>
+        <img src="bg.png" alt="BG" class="poster-img">
+
+        <div class="hotspot spot-lineup" onclick="openMenu('lineup')"></div>
+        <div class="hotspot spot-info" onclick="openMenu('info')"></div>
+        <div class="hotspot spot-special" onclick="openMenu('special')"></div>
+        <div class="hotspot spot-fanworks" onclick="openMenu('fanworks')"></div>
+        <div class="hotspot spot-mainstage" onclick="openMenu('mainstage')"></div>
+        <div class="hotspot spot-creative" onclick="openMenu('creative')"></div>
+        <div class="hotspot spot-evermore" onclick="openMenu('evermore')"></div>
+        <div class="hotspot spot-location" onclick="openMenu('location')"></div>
+    </div>
+
+    <div class="site-footer">
+        2026 EvermoreStars | Design by Everstars Group | ILLUS:ALAN阿兰 WEB：DESIGN:林焰 BUILD：烧鸭 | Inspired by EnsembleStars!!
+    </div>
+
+    <div class="modal-overlay" id="overlay" onclick="closeAll()">
+        <div class="modal-card" id="card" onclick="event.stopPropagation()">
+            <button class="close-btn" onclick="closeAll()">✕</button>
+            <div id="mainView">
+                <div class="modal-header" id="menuTitle">TITLE</div>
+                <div id="itemList"></div>
+            </div>
+            <div id="qqView" style="display:none; text-align: center;">
+                <div class="modal-header">官方游客交流群</div>
+                <img src="QQ.jpg" alt="QQ" class="qq-qrcode">
+                <div style="font-size:1.6rem; color:#12b7f5; font-weight:900;">1077641866</div>
+            </div>
+            <div class="sub-layer" id="subLayer">
+                <span class="back-btn" onclick="closeSub()">← 返回</span>
+                <div class="group-tip" id="subTip">💡 详细内容及报名表格请务必进群查看。</div>
+                <div class="modal-header" id="subTitle">详情</div>
+                <div class="sub-body" id="subBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function hideOpening() {
+            const s = document.getElementById("opening-screen");
+            if(s) {
+                s.style.transition = "opacity 1s ease";
+                s.style.opacity = "0";
+                setTimeout(() => s.remove(), 1000);
+            }
+        }
+        window.addEventListener("load", () => { setTimeout(hideOpening, 3500); });
+
+        // 数据全量恢复
+        const config = {
+            mainstage: { 
+                title: "★ 主舞台招募 (20-25组)", 
+                items: [
+                    { label: "一、招募须知", detail: "【🎭舞台招募】<br>“❓爬台还是爬台，这是个问题。”<br>ESO中央舞台招募正式开始！本次ESO分为主舞台和创意舞台<br>各意向报名制作人请加入舞台审核群：<b>1025885088</b><br>📌舞台投递开放时间： <b>01/24（六）12:00 ~ 05/03（日）12:00</b>" }, 
+                    { label: "二、报名方式", detail: "1. 加入舞台审核群：<b>10258850882</b><br> 2.自行下载《Everstars舞台招募》了解招募须知、内容说明、审核规则、报名方式等详情。<br>3. 前往群公告《中央舞台预报名表》在线编辑表填写团队队名及预报名曲目。<br>4. 前往群文件中自行下载并填写《创意舞台报名表》<br>5. 提交审核材料<br>6. 提交成功后如24小时内未收到成功接收的邮件反馈，请各团队长立刻联系主舞台审核群管理" }, 
+                  ] // <-- 这里之前漏掉了闭合括号
+            }, // <-- 这里之前漏掉了闭合括号
+            creative: { 
+                title: "★ 创意舞台 (3-5组)", 
+                items: [
+                    { label: "一、招募须知", detail: "【🎭舞台招募】<br>“❓爬台还是爬台，这是个问题。”<br>ESO中央舞台招募正式开始！本次ESO分为主舞台和创意舞台<br>各意向报名制作人请加入舞台审核群：<b>1025885088</b><br>📌舞台投递开放时间： <b>01/24（六）12:00 ~ 05/03（日）12:00</b>" }, 
+                    { label: "二、舞台剧类 ", detail: "1. 舞台类型请大胆提案——eg.或许你想看饿死妹自己的环文广：【月永雷欧x德扎 ｜人如何逃离自己的阴影】【五奇人x法红黑 ｜荣耀为我俯首】<br>2. 节目内容需与偶像梦幻祭世界观、角色或剧情设定明确相关。表演选题不作具体限制，可涵盖原作剧情改编，或英美、法、德奥、日韩等地区的原创 or 改编剧目；但请避免选择其他 IP 舞台的 crossover 内容。<br>3. 为维护场馆环境整洁及观演体验，舞台表演原则上避免大型道具搬运，以及血浆、纸花等喷射或抛洒类道具。如确属演出需要，请提前向主办方报备并取得确认；同时鼓励以更安全、灵活、富有创意的方式进行呈现替代。<br>4. 节目创作与演出须尊重舞台、作品及角色形象，内容不得涉及任何敏感、色情、暴力血腥 or 现实争议性话题；严禁出现 any 形式的 “角色黑”、恶意丑化、侮辱性改编或不当重构。" }, 
+                    { label: "三、音乐表演类 ", detail: "1. 音乐表演类舞台仅接受偶像梦幻祭官方歌曲（含国日服游戏内全曲目版本、官方演唱会曲目版本、官方舞台剧内曲目及联动曲目等）；同时鼓励富有创意的方式改编选曲（如将人声改为纯器乐版、编曲改为管弦乐、制作歌曲串烧等等）。<br>2. 音乐表演类舞台形式包括但不限于：器乐独奏（可配合伴奏）/器乐合奏/合唱/乐队演唱 （乐队演唱须为 live 演奏形式，不接受纯音源伴奏）<br>3. 演出所需话筒、音箱、功放等基础音响设备由场地方统一提供；表演者需自行携带乐器及个人使用设备；同时，为避免大型道具搬运，如演出为钢琴演奏，请携带电子键盘。" }, 
+                    { label: "四、报名方式", detail: "1. 加入舞台审核群：<b>10258850882</b><br> 2.自行下载《Everstars舞台招募》了解招募须知、内容说明、审核规则、报名方式等详情。<br>3. 前往群公告《中央舞台预报名表》在线编辑表填写团队队名及预报名曲目。<br>4. 前往群文件中自行下载并填写《创意舞台报名表》<br>5. 提交审核材料<br>6. 提交成功后如24小时内未收到成功接收的邮件反馈，请各团队长立刻联系创意舞台审核群管理。" }
+                ] 
+            },
+            fanworks: { 
+                title: "★ 同人摊位招募", 
+                items: [
+                    { label: "一、申摊须知", detail: "<b>【👩‍🍳同人摊位招募】</b><br>“你想要哪位厨子来炒。”<br>ESO同人摊位招募正式开始！🔥欢迎各位厨子来做饭🥢<br>各意向创作者请加入同人摊位审核群：QQ群号：<b>1081280182</b><br>📌舞台投递开放时间：<b> 01/28（三）16:00 ~ 05/15（五）12:00</b>" }, 
+                    { label: "二、申请方式", detail: "1. 加入QQ群：<b>1081280182</b>。<br>2. 提交申请至邮箱。<br>3. 提交成功后如24小时内未收到成功接收 or 邮件反馈，请各负责人立刻联系同人摊位审核群同人UGC管理。<br>4. 在审核过程中，部分作者会收到来自主办的私信或邮件，提出一些审核中发现需要完善的信息或进行信息核验。" }
+                ] 
+            },
+            location: {  
+                title: "★ 场地指引",  
+                items: [
+                    { label: "一、场馆地址", detail: "<b>上海虹口区瑞虹路188号月亮湾3楼 Morden Sky LAB 摩登天空</b><br><b>交通方式</b>：1.地铁四号线临平路站1、2号出口，步行10分钟左右<br>2.地铁十号线邮电新村站2号出口，步行10分钟左右。<br>3.十四路公交车四平路新港路站，步行10分钟左右" }, 
+                    { label: "二、舞台设备详情", detail: "<b>舞台尺寸：</b>12.85m * 8.03m<br><b>LED屏：</b>9.6m * 6.5m (1984*1312)<br><b>其他：</b>专业灯光、音响、雾机(2台)" }, 
+                    { label: "三、场内实景", detail: `<div class="venue-grid">
+                        <div class="venue-item"><img src="stage1.png" class="venue-img" onclick="window.open(this.src)"><div class="venue-label">舞台全景 1</div></div>
+                        <div class="venue-item"><img src="stage2.png" class="venue-img" onclick="window.open(this.src)"><div class="venue-label">舞台全景 2</div></div>
+                        <div class="venue-item"><img src="restroomA.png" class="venue-img" onclick="window.open(this.src)"><div class="venue-label">休息室 A</div></div>
+                        <div class="venue-item"><img src="restroomB.png" class="venue-img" onclick="window.open(this.src)"><div class="venue-label">休息室 B</div></div>
+                    </div>` }
+                ]  
+            },
+            info: { title: "★ INFO", items: [{ label: "活动介绍", detail: "我们是以制作人为中心，结合偶像梦幻祭IP偶像文化，衍生的同人漫展ONLY企划“Evermore Star！！！未读章节。<br>你入坑偶像梦幻祭多久了？<br>那些你为他打的协力、那些你反复播放的巡演舞台、那些你d过的卡池、买过的谷子、搞过的推活庆祝的生日、追过的线下应援；<br>这些，都是故事里，不可或缺的篇章。<br>所以，这是一篇由你献上的未读章节，无论你是制作人还是偶像，都是故事的主角。<br>我们因对小偶像们的热爱而相遇，这份热爱成就着彼此。在 EvermoreStars的舞台，我们将一同为梦想和未来充满期待，因为永远都有新的惊喜、邂逅、奇迹即将发生。<br>“你注视的光芒，因你而闪耀。”" }] },
+            evermore: { title: "★ 创意活动", items: [ { label: "一、互动游戏", detail: "正在筹备" },{ label: "二、嘉宾舞台", detail: "正在筹备" }, { label: "三、We Ensemble 合唱", detail: "正在筹备" }] },
+            special: { title: "★ 特殊招募", items: [{ label: "正在筹备", detail: "更多活动内容将在未来社媒宣发中公布，敬请期待！" }] },
+            lineup: { 
+                title: "★ 快捷导航", 
+                items: [
+                    { label: "📍 场地信息", detail: "link:location" }, 
+                    { label: "🎤 主舞台", detail: "link:mainstage" }, 
+                    { label: "✨ 创意舞台", detail: "link:creative" }, 
+                    { label: "🎨 同人摊位", detail: "link:fanworks" }
+                ] 
+            }
+        };
+
+       function openMenu(key) {
+    const data = config[key];
+    if(!data) return;
+    document.getElementById('qqView').style.display = 'none';
+    document.getElementById('subLayer').style.display = 'none';
+    document.getElementById('mainView').style.display = 'block';
+    document.getElementById('menuTitle').innerText = data.title;
+    
+    const listEl = document.getElementById('itemList');
+    listEl.innerHTML = '';
+
+    data.items.forEach((item) => {
+        const row = document.createElement('div');
+        
+        // --- 核心改动：如果是嘉宾社交账号，直接在一级列表平铺渲染 ---
+        if(item.isGuest) {
+            row.className = 'guest-social-row'; // 使用你 style 里写好的样式
+            row.style.cursor = 'default';
+            row.innerHTML = `
+                <span class="guest-name-label">${item.name}</span>
+                <div class="guest-icon-group">
+                    <a href=" https://b23.tv/${item.bili}" target="_blank"><i class="fab fa-bilibili"></i></a>
+                    <a href="https://v.douyin.com/${item.dy}" target="_blank"><i class="fab fa-tiktok"></i></a>
+                    <a href="https://xhslink.com/m/${item.xhs}" target="_blank"><i class="fas fa-camera-retro"></i></a>
+                </div>`;
+        } 
+        // --- 核心改动：如果是嘉宾图片，也直接在一级列表平铺 ---
+        else if(item.isImg) {
+            row.style.marginBottom = '15px';
+            row.innerHTML = `<img src="${item.src}" class="guest-full-image">`;
+        } 
+        // --- 普通按钮（跳转 link 或 进详情页） ---
+        else {
+            row.className = 'clickable-row';
+            row.innerHTML = `<span>${item.label}</span><i class="fas fa-chevron-right" style="color:#eee"></i>`;
+            row.onclick = function() {
+                if(item.detail && item.detail.startsWith("link:")) {
+                    openMenu(item.detail.split(":")[1]);
+                } else {
+                    showDetail(data.title, item);
+                }
+            };
+        }
+        listEl.appendChild(row);
+    });
+    
+    document.getElementById('overlay').style.display = 'flex';
+}
+
+        function showDetail(parentTitle, item) {
+            document.getElementById('mainView').style.display = 'none';
+            document.getElementById('subTitle').innerText = item.label;
+            document.getElementById('subTip').style.display = (parentTitle.includes("舞台") || parentTitle.includes("摊位")) ? 'block' : 'none';
+            
+            let content = '';
+            if(item.isGuest) {
+                content = `
+                    <div class="guest-social-row">
+                        <span class="guest-name-label">${item.name}</span>
+                        <div class="guest-icon-group">
+                            <a href="https://space.bilibili.com/${item.bili}" target="_blank"><i class="fab fa-bilibili"></i></a>
+                            <a href="https://v.douyin.com/${item.dy}" target="_blank"><i class="fab fa-tiktok"></i></a>
+                            <a href="https://xhslink.com/m/${item.xhs}" target="_blank"><i class="fas fa-camera-retro"></i></a>
+                        </div>
+                    </div>`;
+            } else if(item.isImg) {
+                content = `<img src="${item.src}" class="guest-full-image">`;
+            } else {
+                content = item.detail;
+            }
+            
+            document.getElementById('subBody').innerHTML = content;
+            document.getElementById('subLayer').style.display = 'flex';
+        }
+
+        function closeSub() { document.getElementById('subLayer').style.display = 'none'; document.getElementById('mainView').style.display = 'block'; }
+        function closeAll() { document.getElementById('overlay').style.display = 'none'; }
+        function openQQPopup() {
+            document.getElementById('mainView').style.display = 'none';
+            document.getElementById('subLayer').style.display = 'none';
+            document.getElementById('qqView').style.display = 'block';
+            document.getElementById('overlay').style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
+</html>
